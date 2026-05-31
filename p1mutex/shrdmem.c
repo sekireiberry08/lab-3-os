@@ -4,15 +4,17 @@
 
 
 int MAX_COUNT = 1e9;
-static int count = 0;
+static long long count = 0;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 void *f_count(void *sid) {
   int i;
   for (i = 0; i < MAX_COUNT; i++) {
+    pthread_mutex_lock(&lock);
     count = count + 1;
+    pthread_mutex_unlock(&lock);
   }
 
-  printf("Thread %s: holding %d \n", (char *) sid, count);
 }
 
 int main() {
@@ -26,8 +28,9 @@ int main() {
   // Wait for thread th1 finish
   pthread_join( thread1, NULL);
 
-  // Wait for thread th1 finish
+  // Wait for thread th2 finish
   pthread_join( thread2, NULL);
-
+  pthread_mutex_destroy(&lock);
+  printf("Final count: %lld \n", count);
   return 0;
 }
