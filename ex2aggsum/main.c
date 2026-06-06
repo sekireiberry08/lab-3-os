@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h> /* for getopt */
-
+#include <pthread.h>
+#include <sys/wait.h>
 #include "utils.h"
 #include <errno.h>
 #include <limits.h>
@@ -35,7 +36,7 @@ extern int generate_array_data (int* buf, int arraysize, int seednum);
 /** display help */
 extern void help (int xcode);
 
-void* sum_worker (struct _range idx_range);
+void* sum_worker (void* arg);
 long validate_sum(int arraysize);
 
 /* Global sum buffer */
@@ -43,13 +44,16 @@ long sumbuf = 0;
 int* shrdarrbuf;
 pthread_mutex_t mtx;
 
-void* sum_worker (struct _range idx_range) {
-   int i;
-   
-   //printf("In worker from %d to %d\n", idx_range.start, idx_range.end);
-   
-   return 0;
-		
+void* sum_worker (void* arg) {
+   struct _range* idx_range = (struct _range*) arg;
+   long local_sum = 0;
+   for (int i = idx_range->start; i <= idx_range->end; i++)
+      local_sum += shrdarrbuf[i];
+   printf("In worker from %d to %d\n", idx_range->start, idx_range->end);
+   pthread_mutex_lock(&mtx);
+   sumbuf += local_sum;
+   pthread_mutex_unlock(&mtx);
+   return NULL;
 }
 
 int main(int argc, char * argv[]) {
@@ -58,6 +62,7 @@ int main(int argc, char * argv[]) {
    struct _range* thread_idx_range;
    pthread_t* tid;
    int pid;
+   pthread_mutex_init(&mtx, NULL);
 
     if (argc < 3 || argc > 4) /* only accept 2 or 3 arguments */
       help(EXIT_SUCCESS);
@@ -117,16 +122,16 @@ int main(int argc, char * argv[]) {
    tid = malloc (appconf.tnum * sizeof(pthread_t));
 
    for (i=0; i < appconf.tnum; i++)
-      pthread_create(&tid[i], NULL, sum_worker, (
-                     struct _range) (thread_idx_range[i]));
+      pthread_create(&tid[i], NULL, sum_worker, (void*)&thread_idx_range[i]);
    for (i=0; i < appconf.tnum; i++)
       pthread_join(tid[i], NULL);
    fflush(stdout);
 	
    printf("%s gives sum result %ld\n", PACKAGE, sumbuf);
 
-   waitpid(pid);
-      exit(0);
+   waitpid(pid, NULL, 0);
+   pthread_mutex_destroy(&mtx);
+   exit(0);
 }
 
 long validate_sum(int arraysize)
