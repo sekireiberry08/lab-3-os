@@ -23,7 +23,7 @@ int main()
 
    // Khởi tạo semaphore cho phòng ăn (tối đa 4 người)
    sem_init(&room, 0, 4);
-
+   
    // Khởi tạo semaphore cho từng cây đũa (giá trị là 1 - tự do)
    for (i = 0; i < N; i++)
       sem_init(&chopstick[i], 0, 1);

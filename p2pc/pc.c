@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <pthread.h>
+
 #include <unistd.h>
 
 #define BUF_SIZE 2
