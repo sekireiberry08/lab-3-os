@@ -9,9 +9,11 @@
 
 char logbuf[MAX_BUFFER_SLOT][MAX_LOG_LENGTH];
 
-int count;
+int count = 0;
 void flushlog();
-
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond_flush = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond_write = PTHREAD_COND_INITIALIZER;
 struct _args
 {
    unsigned int interval;
@@ -24,10 +26,16 @@ void *wrlog(void *data)
 
    usleep(20);
    sprintf(str, "%d", id);
+   pthread_mutex_lock(&mtx);
+   while (count >= MAX_BUFFER_SLOT)
+      pthread_cond_wait(&cond_write, &mtx);
    strcpy(logbuf[count], str);
-   count = (count > MAX_BUFFER_SLOT)? count :(count + 1); /* Only increase count to size MAX_BUFFER_SLOT*/
+   count++; /* Only increase count to size MAX_BUFFER_SLOT*/
    printf("wrlog(): %d \n", id);
-
+   if (count == MAX_BUFFER_SLOT) {
+      pthread_cond_signal(&cond_flush);
+   }
+   pthread_mutex_unlock(&mtx);
    return 0;
 }
 
@@ -35,20 +43,21 @@ void flushlog()
 {
    int i;
    char nullval[MAX_LOG_LENGTH];
-
+   pthread_mutex_lock(&mtx);
    printf("flushlog()\n");
-   sprintf(nullval, "%d", -1);
-   for (i = 0; i < count; i++)
-   {
-      printf("Slot  %i: %s\n", i, logbuf[i]);
-      strcpy(logbuf[i], nullval);
+   if (count > 0){
+      sprintf(nullval, "%d", -1);
+      for (i = 0; i < count; i++)
+      {
+         printf("Slot  %i: %s\n", i, logbuf[i]);
+         strcpy(logbuf[i], nullval);
+      }
+      fflush(stdout);
+      /*Reset buffer */
+      count = 0;
+      pthread_cond_broadcast(&cond_write);
    }
-
-   fflush(stdout);
-
-   /*Reset buffer */
-   count = 0;
-
+   pthread_mutex_unlock(&mtx);
    return;
 
 }
